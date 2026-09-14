@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 
 
 # ============================================================
-# RAILWAY HTTP SERVER
+# RAILWAY
 # ============================================================
 
 PORT = int(os.environ.get("PORT", "8080"))
@@ -15,27 +15,23 @@ HOST = "0.0.0.0"
 
 
 class HealthHandler(BaseHTTPRequestHandler):
+
     def do_GET(self):
         self.send_response(200)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Type", "text/plain")
         self.end_headers()
-
-        self.wfile.write(
-            b"Railway Chromium bot is running.\n"
-        )
+        self.wfile.write(b"Browser bot is running.")
 
     def log_message(self, format, *args):
-        # Prevent unnecessary HTTP request logs
-        return
+        pass
 
 
-def start_http_server():
+def start_health_server():
     server = HTTPServer((HOST, PORT), HealthHandler)
 
     print("==========================================")
-    print(" Railway HTTP server started")
-    print(f" Host : {HOST}")
-    print(f" Port : {PORT}")
+    print(" Railway health server started")
+    print(f" Listening on {HOST}:{PORT}")
     print("==========================================")
 
     server.serve_forever()
@@ -58,21 +54,21 @@ SITES = [
 # SETTINGS
 # ============================================================
 
-# 60 seconds is enough for normal page loading.
-# A failed/slow site will not block the whole program for hours.
-PAGE_TIMEOUT = 60_000
+PAGE_TIMEOUT = 60000
 
 
 # ============================================================
-# LOAD ALL SITES
+# LOAD SITES
 # ============================================================
 
 async def load_all_sites(pages):
+
     tasks = []
 
     for i, page in enumerate(pages):
 
         async def load(page=page, index=i):
+
             url = SITES[index]
 
             print()
@@ -80,15 +76,17 @@ async def load_all_sites(pages):
             print(f"       {url}")
 
             try:
+
                 await page.goto(
                     url,
                     wait_until="domcontentloaded",
-                    timeout=PAGE_TIMEOUT,
+                    timeout=PAGE_TIMEOUT
                 )
 
-                print(f"[OK] Site {index + 1} loaded")
+                print(f"[OK]   Site {index + 1}")
 
             except Exception as e:
+
                 print(f"[ERROR] Site {index + 1}")
                 print(f"        {type(e).__name__}: {e}")
 
@@ -103,28 +101,17 @@ async def load_all_sites(pages):
 
 async def main():
 
-    print()
-    print("==========================================")
-    print(" Starting Railway Chromium")
-    print("==========================================")
-    print()
-
-    print(f"Railway PORT: {PORT}")
-    print(f"Sites to open: {len(SITES)}")
-    print()
-
     # --------------------------------------------------------
-    # Start Railway HTTP server in background
+    # Start Railway health server
     # --------------------------------------------------------
 
-    http_thread = threading.Thread(
-        target=start_http_server,
-        daemon=True,
+    health_thread = threading.Thread(
+        target=start_health_server,
+        daemon=True
     )
 
-    http_thread.start()
+    health_thread.start()
 
-    # Give the HTTP server a moment to start
     await asyncio.sleep(1)
 
     # --------------------------------------------------------
@@ -133,9 +120,14 @@ async def main():
 
     async with async_playwright() as p:
 
-        print("Starting Chromium...")
+        print()
+        print("==========================================")
+        print(" Starting Railway Chromium")
+        print("==========================================")
+        print()
 
         try:
+
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
@@ -144,31 +136,34 @@ async def main():
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
                     "--disable-software-rasterizer",
-                ],
+                ]
             )
 
         except Exception as e:
+
             print()
             print("==========================================")
             print(" FAILED TO START CHROMIUM")
             print("==========================================")
             print()
-            print(type(e).__name__)
             print(e)
+
             return
 
         print("Chromium started successfully.")
         print()
 
         # ----------------------------------------------------
-        # Browser context
+        # Create browser context
         # ----------------------------------------------------
 
         context = await browser.new_context()
 
         pages = []
 
+        # One page for each site
         for _ in SITES:
+
             page = await context.new_page()
             pages.append(page)
 
@@ -176,38 +171,34 @@ async def main():
         print()
 
         # ----------------------------------------------------
-        # Load all sites
+        # Open all 5 sites
         # ----------------------------------------------------
 
         print("==========================================")
-        print(" Loading all sites")
+        print(" Loading all 5 sites simultaneously")
         print("==========================================")
         print()
 
         await load_all_sites(pages)
 
         # ----------------------------------------------------
-        # Finished
+        # Keep browser alive
         # ----------------------------------------------------
 
         print()
         print("==========================================")
-        print(" ALL SITES HAVE BEEN PROCESSED")
+        print(" ALL 5 SITES ARE OPEN")
         print("==========================================")
         print()
-
         print(f"Total sites : {len(SITES)}")
-        print(f"HTTP port  : {PORT}")
         print()
         print("Chromium will remain running.")
-        print("Railway HTTP server will remain running.")
+        print("All browser pages will remain open.")
+        print("Script will continue until Railway stops it.")
         print()
 
-        # ----------------------------------------------------
-        # Keep Chromium and pages alive
-        # ----------------------------------------------------
-
         while True:
+
             await asyncio.sleep(3600)
 
 
@@ -218,11 +209,10 @@ async def main():
 if __name__ == "__main__":
 
     try:
+
         asyncio.run(main())
 
     except KeyboardInterrupt:
 
         print()
-        print("==========================================")
-        print(" Stopped by user.")
-        print("==========================================")
+        print("Stopped.")
