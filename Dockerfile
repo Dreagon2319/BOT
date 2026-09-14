@@ -10,4 +10,4 @@ RUN playwright install --with-deps chromium
 
 COPY main.py .
 
-CMD ["python", "main.py"]
+CMD ["python", "-u", "main.py"]
