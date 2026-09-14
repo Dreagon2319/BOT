@@ -1,6 +1,8 @@
 import asyncio
 from playwright.async_api import async_playwright
 
+print("===== MAIN.PY STARTED =====", flush=True)
+
 SITES = [
     "https://bloxd.com/play/classic_survival?lobby=2025",
     "https://bloxd.dev/play/classic_survival?lobby=2025",
@@ -12,9 +14,11 @@ SITES = [
 
 async def main():
 
+    print("===== ENTERING MAIN =====", flush=True)
+
     async with async_playwright() as p:
 
-        print("Starting Chromium...")
+        print("Starting Chromium...", flush=True)
 
         browser = await p.chromium.launch(
             headless=True,
@@ -25,13 +29,15 @@ async def main():
             ]
         )
 
+        print("Chromium started.", flush=True)
+
         context = await browser.new_context()
 
         for url in SITES:
 
             page = await context.new_page()
 
-            print(f"Opening: {url}")
+            print(f"Opening: {url}", flush=True)
 
             try:
                 await page.goto(
@@ -40,15 +46,14 @@ async def main():
                     timeout=60000
                 )
 
-                print(f"Opened: {url}")
+                print(f"Opened: {url}", flush=True)
 
             except Exception as e:
-                print(f"Failed: {url}")
-                print(e)
+                print(f"Failed: {url}", flush=True)
+                print(repr(e), flush=True)
 
-        print()
-        print("All pages are open.")
-        print("Keeping Chromium running forever.")
+        print("All pages are open.", flush=True)
+        print("Keeping Chromium running forever.", flush=True)
 
         await asyncio.Event().wait()
 
