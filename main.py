@@ -1,7 +1,23 @@
+
 import asyncio
 from playwright.async_api import async_playwright
 
-print("===== MAIN.PY STARTED =====", flush=True)
+
+# ============================================================
+# BROWSERLESS
+# ============================================================
+
+BROWSERLESS_TOKEN = "2VFy4h6txqWIeq6fa3dfd60e27f37549823ffe9f788800d15"
+
+WS_ENDPOINT = (
+    f"wss://production-sfo.browserless.io"
+    f"?token={BROWSERLESS_TOKEN}"
+)
+
+
+# ============================================================
+# SITES
+# ============================================================
 
 SITES = [
     "https://bloxd.com/play/classic_survival?lobby=2025",
@@ -12,51 +28,205 @@ SITES = [
 ]
 
 
-async def main():
+# ============================================================
+# SETTINGS
+# ============================================================
 
-    print("===== ENTERING MAIN =====", flush=True)
+# Playwright timeout is in milliseconds
+PAGE_TIMEOUT = 60000000
 
-    async with async_playwright() as p:
+# Stay connected for 2 minutes
+SESSION_TIME = 110
 
-        print("Starting Chromium...", flush=True)
 
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-            ]
-        )
+# ============================================================
+# LOAD ALL 5 SITES
+# ============================================================
 
-        print("Chromium started.", flush=True)
+async def load_all_sites(context):
 
-        context = await browser.new_context()
+    pages = []
 
-        for url in SITES:
+    # Create all 5 pages first
+    for _ in SITES:
+        page = await context.new_page()
+        pages.append(page)
 
-            page = await context.new_page()
+    print()
+    print(f"Created {len(pages)} browser pages.")
+    print()
 
-            print(f"Opening: {url}", flush=True)
+    tasks = []
+
+    for i, page in enumerate(pages):
+
+        async def load(page=page, index=i):
+
+            url = SITES[index]
 
             try:
+
+                print(f"[OPEN] {index + 1}/{len(SITES)}")
+                print(f"       {url}")
+
                 await page.goto(
                     url,
                     wait_until="domcontentloaded",
-                    timeout=60000
+                    timeout=PAGE_TIMEOUT
                 )
 
-                print(f"Opened: {url}", flush=True)
+                print(f"[OK]   Site {index + 1}")
 
             except Exception as e:
-                print(f"Failed: {url}", flush=True)
-                print(repr(e), flush=True)
 
-        print("All pages are open.", flush=True)
-        print("Keeping Chromium running forever.", flush=True)
+                print(f"[ERROR] Site {index + 1}")
+                print(f"        {e}")
 
-        await asyncio.Event().wait()
+        tasks.append(load())
 
+    # Start all 5 sites simultaneously
+    await asyncio.gather(*tasks)
+
+    return pages
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+async def main():
+
+    async with async_playwright() as p:
+
+        cycle = 0
+
+        while True:
+
+            cycle += 1
+
+            print()
+            print("==========================================")
+            print(f" Browserless cycle #{cycle}")
+            print("==========================================")
+            print()
+
+            browser = None
+            pages = []
+
+            try:
+
+                # ==================================================
+                # CONNECT
+                # ==================================================
+
+                print("Connecting to Browserless...")
+
+                browser = await p.chromium.connect_over_cdp(
+                    WS_ENDPOINT
+                )
+
+                print("Connected successfully.")
+                print()
+
+                # Browserless default context
+                context = browser.contexts[0]
+
+                # ==================================================
+                # LOAD ALL 5 SITES
+                # ==================================================
+
+                print("==========================================")
+                print(" Loading all 5 sites simultaneously")
+                print("==========================================")
+                print()
+
+                pages = await load_all_sites(context)
+
+                print()
+                print("==========================================")
+                print(" ALL 5 SITES ARE OPEN")
+                print("==========================================")
+                print()
+
+                # ==================================================
+                # KEEP SESSION ALIVE FOR 2 MIN 10 SEC
+                # ==================================================
+
+                print("Connected for 2 minutes")
+                print("Waiting...")
+
+                await asyncio.sleep(SESSION_TIME)
+
+                # ==================================================
+                # DISCONNECT
+                # ==================================================
+
+                print()
+                print("==========================================")
+                print(" 2 MIN 10 SEC COMPLETE")
+                print(" Disconnecting from Browserless...")
+                print("==========================================")
+                print()
+
+            except Exception as e:
+
+                print()
+                print("==========================================")
+                print(" Browserless error")
+                print("==========================================")
+                print()
+                print(e)
+                print()
+
+            finally:
+
+                # ==================================================
+                # CLOSE PAGES
+                # ==================================================
+
+                for page in pages:
+
+                    try:
+                        await page.close()
+                    except Exception:
+                        pass
+
+                # ==================================================
+                # DISCONNECT BROWSERLESS
+                # ==================================================
+
+                if browser:
+
+                    try:
+                        await browser.close()
+                    except Exception:
+                        pass
+
+                print("Disconnected from Browserless.")
+                print()
+
+            # ======================================================
+            # RECONNECT
+            # ======================================================
+
+            print("Starting new Browserless connection...")
+            print()
+
+
+# ============================================================
+# START
+# ============================================================
 
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    try:
+
+        asyncio.run(main())
+
+    except KeyboardInterrupt:
+
+        print()
+        print("==========================================")
+        print(" Script stopped by user.")
+        print("==========================================")
+
